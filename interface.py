@@ -11,28 +11,47 @@ root: Tk = None
 PROC: subprocess.Popen = None
 
 
-def stream_transcription(file: Path):
+def output_string(log, string: str):
+    log.write(string)
+    log.flush()
+    sys.stdout.write(string)
+    sys.stdout.flush()
+    output_text.insert(tk.END, string)
+
+
+def stream_transcription(filepath: Path):
     """ Main function, calls the diarize script with the appropriate parameters """
     global PROC
     if PROC is not None:
         PROC.kill()
 
     PROC = subprocess.Popen(
-        [r".\run.bat", sys.executable, os.path.abspath(file)],
+        [
+            sys.executable,
+            "./diarize.py",
+            "-a", os.path.abspath(filepath),
+            "--whisper-model", "large-v3",
+            "--device", "cpu",
+            "--language", "nl",
+        ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        shell=True,
+        shell=False,
     )
 
     yield f"Started process {PROC.pid} with python interpreter {sys.executable}\n\n"
-    with open(file.with_suffix(".log"), "w+", errors="ignore") as log:
-        # stream output to log, stdout and streamlit
-        for c in iter(lambda: PROC.stdout.read(1), b""):
-            log.buffer.write(c)
-            log.flush()
-            sys.stdout.buffer.write(c)
-            sys.stdout.flush()
-            yield c.decode("utf-8", errors="ignore")
+
+    # stream word by word
+    word = ""
+    for c in iter(lambda: PROC.stdout.read(1), b""):
+        k: str = c.decode("utf-8", errors="ignore")
+        if k.isspace():
+            yield word + k
+            word = ""
+        else:
+            word += k
+    if word:
+        yield word
 
     # cleanup
     PROC.wait()
@@ -52,14 +71,15 @@ def start_process():
 def poll_subprocess(filepath: Path):
     """ Poll the transcription process to stream output to the window """
     try:
-        for output in stream_transcription(filepath):
-            end_visible = output_text.yview()[1] == 1.0
-            output_text.insert(tk.END, output)
-            if end_visible:
-                # scroll to the end if the end was already visible
-                # this prevents autoscrolling if the user is scrolling
-                # manually
-                output_text.see(tk.END)
+        with open(filepath.with_suffix(".log"), "w+", errors="ignore") as log:
+            for output in stream_transcription(filepath):
+                end_visible = output_text.yview()[1] == 1.0
+                output_string(log, output)
+                if end_visible:
+                    # scroll to the end if the end was already visible
+                    # this prevents autoscrolling if the user is scrolling
+                    # manually
+                    output_text.see(tk.END)
     except RuntimeError:
         # it is possible we tried to append to the output text
         # after the window was closed

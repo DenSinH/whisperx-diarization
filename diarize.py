@@ -12,6 +12,11 @@ import logging
 from contextlib import contextmanager
 
 
+# get a huggingface (read) token from
+# https://huggingface.co/settings/tokens
+# and fill in the form at
+# https://huggingface.co/pyannote/segmentation-3.0
+# to access the diarization model
 HF_TOKEN = os.environ["HF_TOKEN"]
 MTYPES = {"cpu": "int8", "cuda": "float16"}
 MODEL_DIR = "./.models/"
@@ -28,7 +33,7 @@ def get_args():
     parser.add_argument(
         "--whisper-model",
         dest="model_name",
-        default="medium.en",
+        default="large-v3",
         help="name of the Whisper model to use",
     )
 
@@ -100,7 +105,7 @@ def _transcription_context():
 
 def _print_segment(segment):
     """ Print a single segment, to be followed up by more """
-    print(segment["text"].strip(), end=" ")
+    print(segment["text"].strip(), end=" ", flush=True)
 
 
 def _print_transcription_onload(result):
@@ -231,4 +236,3 @@ if __name__ == '__main__':
 
     with open(Path(args.audio).with_suffix(".txt"), "w+") as f:
         write_diarized_transcript(f, diarized)
-
