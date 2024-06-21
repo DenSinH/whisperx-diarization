@@ -26,6 +26,10 @@ AUDIO_HASH = None
 
 
 class LogIter:
+    """ Basic wrapper around an iterator to log progress
+    This is needed to log progress in whisperx alignment
+    which does not support a progress printing hook
+    (at least, not one that works...) """
 
     def __init__(self, iterable):
         self.iterable = iterable
@@ -53,12 +57,12 @@ def get_args():
 
     """ 
     from https://github.com/openai/whisper:
-    Size	Parameters	English-only model	Multilingual model	Required VRAM	Relative speed
-    tiny	39 M	    tiny.en	            tiny	            ~1 GB	        ~32x
-    base	74 M	    base.en	            base	            ~1 GB	        ~16x
-    small	244 M	    small.en	        small	            ~2 GB	        ~6x
-    medium	769 M	    medium.en	        medium	            ~5 GB	        ~2x
-    large	1550 M	    N/A	large	        ~10 GB	                            1x
+    Size     Parameters  English-only model    Multilingual model    Required VRAM    Relative speed
+    tiny     39 M        tiny.en               tiny                  ~1 GB            ~32x
+    base     74 M        base.en               base                  ~1 GB            ~16x
+    small    244 M      small.en              small                  ~2 GB            ~6x
+    medium   769 M     medium.en             medium                  ~5 GB            ~2x
+    large    1550 M     N/A                   large                  ~10 GB           1x
     large-v2
     large-v3
     """
@@ -97,6 +101,12 @@ def get_args():
 
 
 def cached(file: str, onload=None):
+    """ Decorator to cache function result to a file,
+    expected to be used on functions for which the first
+    argument is the audio file being processed
+    We use the global AUDIO_HASH variable to set the correct
+    cache path. """
+
     def decorator(func):
         @wraps(func)
         def wrapped(audio, *args, **kwargs):
@@ -164,7 +174,7 @@ def transcribe(audio: np.array):
         threads=0  # max threads
     )
 
-    # monkey patch the whisper model call to print intermediate output
+    """ monkey patch the whisper model call to print intermediate output """
     _whisper_model_call = model.__call__
 
     def _whisper_model_call_monkey_patch(*args, **kwargs):
@@ -228,7 +238,7 @@ def diarize(audio, aligned, min_speakers=None, max_speakers=None):
             message += f": {completed} / {total}"
         logging.info(message)
 
-    # monkey patch DiarizationPipeline.setup_hook
+    """ monkey patch DiarizationPipeline.setup_hook """
     def _pipeline_setup_hook_monkey_patch(*args, **kwargs):
         logging.info("Setting up diarization hook")
         return _hook
