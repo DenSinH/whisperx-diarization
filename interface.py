@@ -31,7 +31,8 @@ def stream_transcription(filepath: Path):
             "./diarize.py",
             "-a", os.path.abspath(filepath),
             "--whisper-model", "large-v3",
-            "--device", "cpu",
+            # "--device", "cpu",  # commented out for auto-selection based on cuda availability
+            "--batch-size", "0",  # 16 is too large, run out of GPU memory
             "--language", "nl",
         ],
         stdout=subprocess.PIPE,

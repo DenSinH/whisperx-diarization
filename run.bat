@@ -9,4 +9,4 @@ if "%~2"=="" (
     set "file=%~2"
 )
 
-"%python_interpreter%" ./diarize.py -a "%file%" --whisper-model large-v3 --device cpu --language nl
+"%python_interpreter%" ./diarize.py -a "%file%" --whisper-model large-v3 --language nl

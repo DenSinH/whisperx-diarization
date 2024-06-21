@@ -1,3 +1,4 @@
+import typing
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -137,7 +138,10 @@ def _transcription_context():
 
 def _print_segment(segment):
     """ Print a single segment, to be followed up by more """
-    print(segment["text"].strip(), end=" ", flush=True)
+    text = segment["text"]
+    if isinstance(text, list):
+        text = text[0]
+    print(text.strip(), end=" ", flush=True)
 
 
 def _print_transcription_onload(result):
@@ -169,7 +173,7 @@ def transcribe(audio: np.array):
             yield segment
     model.__call__ = _whisper_model_call_monkey_patch
 
-    logging.info("Transcribing audio")
+    logging.info(f"Transcribing audio on {args.device} with batch size {args.batch_size}")
     with _transcription_context():
         result = model.transcribe(
             audio,
@@ -210,6 +214,27 @@ def diarize(audio, aligned, min_speakers=None, max_speakers=None):
     )
 
     logging.info("Diarizing speakers")
+
+    """
+    See the 'apply' method in 
+    from pyannote.audio.pipelines.speaker_diarization import SpeakerDiarization:
+    """
+    if typing.TYPE_CHECKING:
+        from pyannote.audio.pipelines.speaker_diarization import SpeakerDiarization
+
+    def _hook(step, *args, completed=None, total=None, **kwargs):
+        message = f"Diarization step {step}"
+        if completed is not None and total is not None:
+            message += f": {completed} / {total}"
+        logging.info(message)
+
+    # monkey patch DiarizationPipeline.setup_hook
+    def _pipeline_setup_hook_monkey_patch(*args, **kwargs):
+        logging.info("Setting up diarization hook")
+        return _hook
+    diarize_model.model.setup_hook = _pipeline_setup_hook_monkey_patch
+
+    # call patched diarization model
     diarize_segments = diarize_model(audio, min_speakers=min_speakers, max_speakers=max_speakers)
     result = whisperx.assign_word_speakers(diarize_segments, aligned)
 
