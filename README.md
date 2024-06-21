@@ -47,3 +47,19 @@ The script produces two files:
   of whether you selected speaker recognition or not.
 - `<audio file>.txt` containing the full transcript, either with or 
   without speaker recognition, depending on your selection.
+
+## Debugging
+
+Some problems I encountered setting up.
+
+### 'cublas64_12.dll' not found
+
+If for some reason this DLL (`cublas64_12.dll`) is not found, I added its folder to the `PATH`.
+The folder should be something like 
+`C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.5\bin`
+
+### Only !!!!! output
+
+So apparently the ! token is 0, meaning something is going wrong in the transcription.
+In this case, you should try lowering the `--batch-size` parameter in `interface.py`,
+or in your command line call to `diarize.py`.
