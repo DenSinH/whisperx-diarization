@@ -24,11 +24,43 @@ CACHE_DIR = Path("./.cache/")
 AUDIO_HASH = None
 
 
+class LogIter:
+
+    def __init__(self, iterable):
+        self.iterable = iterable
+
+    def __iter__(self):
+        for i, segment in enumerate(self.iterable):
+            logging.info(f"Processing segment {i} / {len(self.iterable)}")
+            yield segment
+
+    def __len__(self):
+        return len(self.iterable)
+
+    def __getitem__(self, item):
+        return self.iterable[item]
+
+    def __setitem__(self, key, value):
+        self.iterable[key] = value
+
+
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-a", "--audio", help="name of the target audio file", required=True
     )
+
+    """ 
+    from https://github.com/openai/whisper:
+    Size	Parameters	English-only model	Multilingual model	Required VRAM	Relative speed
+    tiny	39 M	    tiny.en	            tiny	            ~1 GB	        ~32x
+    base	74 M	    base.en	            base	            ~1 GB	        ~16x
+    small	244 M	    small.en	        small	            ~2 GB	        ~6x
+    medium	769 M	    medium.en	        medium	            ~5 GB	        ~2x
+    large	1550 M	    N/A	large	        ~10 GB	                            1x
+    large-v2
+    large-v3
+    """
 
     parser.add_argument(
         "--whisper-model",
@@ -158,12 +190,12 @@ def align(audio, transcript):
 
     logging.info("Aligning segments")
     result = whisperx.align(
-        transcript["segments"],
+        LogIter(transcript["segments"]),
         model_a,
         metadata,
         audio,
         args.device,
-        return_char_alignments=False
+        return_char_alignments=False,
     )
 
     return result
@@ -192,12 +224,13 @@ def write_diarized_transcript(fp, diarized):
     fp.write(f"{previous_speaker}: ")
 
     for segment in diarized["segments"]:
-        speaker = segment["speaker"]
+        # get previous speaker by default
+        speaker = segment.get("speaker", previous_speaker)
         sentence = segment["text"].strip()
 
         # if this speaker doesn't match the previous one, start a new paragraph
         if speaker != previous_speaker:
-            fp.write(f"\n\n{speaker}: ")
+            fp.write(f"\n\n{speaker}:\n")
             previous_speaker = speaker
 
         fp.write(sentence)

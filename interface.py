@@ -56,7 +56,7 @@ def stream_transcription(filepath: Path):
     # cleanup
     PROC.wait()
     PROC = None
-    yield "Cleanup complete"
+    yield "Cleanup complete\n"
 
 
 def start_process():
