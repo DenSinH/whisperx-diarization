@@ -270,7 +270,7 @@ def write_diarized_transcript(fp, diarized):
         return
 
     previous_speaker = diarized["segments"][0]["speaker"]
-    fp.write(f"{previous_speaker}: ")
+    fp.write(f"{previous_speaker}:\n")
 
     for segment in diarized["segments"]:
         # get previous speaker by default
