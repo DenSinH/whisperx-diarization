@@ -306,15 +306,8 @@ if __name__ == '__main__':
 
     transcript = transcribe(audio)
 
-    # delete model if low on GPU resources
-    # import gc; gc.collect(); torch.cuda.empty_cache(); del model
-
     if args.diarize:
         aligned = align(audio, transcript)
-
-        # delete model if low on GPU resources
-        # gc.collect(); torch.cuda.empty_cache(); del model_a
-
         diarized = diarize(audio, aligned)
 
         with open(Path(args.audio).with_suffix(".txt"), "w+") as f:
