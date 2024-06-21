@@ -23,6 +23,15 @@ you can then run `install-torch-cuda.bat` to install a CUDA-compiled
 version of `torch`, which significantly
 speeds up the transcription process.
 
+You will need to create a HuggingFaceHub account, and a READ enabled
+access token, to set as the `HF_TOKEN` environment variable (either
+directly, or in a `.env` file). This is to gain access to the
+diarization model:
+[https://huggingface.co/pyannote/segmentation-3.0](https://huggingface.co/pyannote/segmentation-3.0)
+(Clicking that link will prompt you to sign up, do this and go to Profile picture > Settings > Access tokens
+and create a new access token with READ access). You may need to go back to the model link above,
+and validate some form, but I am not entirely sure.
+
 ## Patches
 
 There are some patches applied to `whisperx` in `diarize.py`,
