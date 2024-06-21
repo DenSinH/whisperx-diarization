@@ -3,38 +3,52 @@ import tkinter as tk
 from tkinter import scrolledtext, filedialog, messagebox
 import subprocess
 import threading
+import time
 from pathlib import Path
 import os.path
 import sys
 
 root: Tk = None
 PROC: subprocess.Popen = None
+OUTPUT_LOCK = threading.Lock()
+OUTPUT_BUFFER = ""
 
 
 def output_string(log, string: str):
+    global OUTPUT_BUFFER
     log.write(string)
     log.flush()
     sys.stdout.write(string)
     sys.stdout.flush()
-    output_text.insert(tk.END, string)
+    with OUTPUT_LOCK:
+        OUTPUT_BUFFER += string
 
 
-def stream_transcription(filepath: Path):
+def stream_transcription(filepath: Path, diarize):
     """ Main function, calls the diarize script with the appropriate parameters """
-    global PROC
+    global PROC, OUTPUT_BUFFER
     if PROC is not None:
         PROC.kill()
 
+    # clear output buffer
+    with OUTPUT_LOCK:
+        OUTPUT_BUFFER = ""
+
+    cmd = [
+        sys.executable,
+        "./diarize.py",
+        "-a", os.path.abspath(filepath),
+        "--whisper-model", "large-v3",
+        # "--device", "cpu",  # commented out for auto-selection based on cuda availability
+        "--batch-size", "4",  # 16 is too large, run out of GPU memory
+        "--language", "nl",
+    ]
+
+    if not diarize:
+        cmd.append("--no-diarize")
+
     PROC = subprocess.Popen(
-        [
-            sys.executable,
-            "./diarize.py",
-            "-a", os.path.abspath(filepath),
-            "--whisper-model", "large-v3",
-            # "--device", "cpu",  # commented out for auto-selection based on cuda availability
-            "--batch-size", "0",  # 16 is too large, run out of GPU memory
-            "--language", "nl",
-        ],
+        cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         shell=False,
@@ -66,21 +80,15 @@ def start_process():
     if filepath:
         # clear the text box
         output_text.delete("1.0", tk.END)
-        threading.Thread(target=poll_subprocess, args=(Path(filepath),), daemon=True).start()
+        threading.Thread(target=poll_subprocess, args=(Path(filepath), diarize_var.get()), daemon=True).start()
 
 
-def poll_subprocess(filepath: Path):
+def poll_subprocess(filepath: Path, diarize: bool):
     """ Poll the transcription process to stream output to the window """
     try:
         with open(filepath.with_suffix(".log"), "w+", errors="ignore") as log:
-            for output in stream_transcription(filepath):
-                end_visible = output_text.yview()[1] == 1.0
+            for output in stream_transcription(filepath, diarize):
                 output_string(log, output)
-                if end_visible:
-                    # scroll to the end if the end was already visible
-                    # this prevents autoscrolling if the user is scrolling
-                    # manually
-                    output_text.see(tk.END)
     except RuntimeError:
         # it is possible we tried to append to the output text
         # after the window was closed
@@ -116,9 +124,13 @@ if __name__ == '__main__':
     frame = tk.Frame(root, bg="#2b2b2b")
     frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
+    # top frame for controls
+    top_frame = tk.Frame(frame, bg="#2b2b2b")
+    top_frame.pack(side=tk.TOP, fill=tk.X, pady=10)
+
     # widgets
     select_file_btn = tk.Button(
-        frame,
+        top_frame,
         text="Kies Bestand",
         command=start_process,
         bg="#2b2b2b",
@@ -126,7 +138,21 @@ if __name__ == '__main__':
         padx=10,
         pady=5
     )
-    select_file_btn.pack()
+    select_file_btn.pack(side=tk.LEFT, padx=(0, 10))
+
+    # Add a checkbox for 'Sprekerherkenning'
+    diarize_var = tk.BooleanVar()
+    diarize_cb = tk.Checkbutton(
+        top_frame,
+        text="Sprekerherkenning",
+        variable=diarize_var,
+        bg="#2b2b2b",
+        fg="#FFFFFF",
+        selectcolor="#2b2b2b",
+        activebackground="#2b2b2b",
+        activeforeground="#FFFFFF"
+    )
+    diarize_cb.pack(side=tk.LEFT)
 
     # scrolled output to view progress
     output_text = tk.scrolledtext.ScrolledText(
@@ -136,11 +162,41 @@ if __name__ == '__main__':
         fg="#FFFFFF",
         insertbackground="#FFFFFF",
     )
-    output_text.pack(pady=10, fill=tk.BOTH, expand=True)
+    output_text.config(state=tk.DISABLED, cursor="arrow")
+    output_text.pack(side=tk.BOTTOM, pady=10, fill=tk.BOTH, expand=True)
     frame.pack_propagate(True)
 
     # register on-close handler
     root.protocol("WM_DELETE_WINDOW", on_close)
+
+    def _update_output():
+        prev_output_length = 0
+        while True:
+            with OUTPUT_LOCK:
+                if len(OUTPUT_BUFFER) == prev_output_length:
+                    continue
+
+                output_text.config(state=tk.NORMAL)
+                # clear output if we removed text
+                if len(OUTPUT_BUFFER) < prev_output_length:
+                    output_text.delete('1.0', tk.END)
+                    prev_output_length = 0
+
+                # insert new output
+                end_visible = output_text.yview()[1] == 1.0
+                output_text.insert(tk.END, OUTPUT_BUFFER[prev_output_length:])
+                output_text.config(state=tk.DISABLED)
+                prev_output_length = len(OUTPUT_BUFFER)
+
+            if end_visible:
+                # scroll to the end if the end was already visible
+                # this prevents autoscrolling if the user is scrolling
+                # manually
+                output_text.see(tk.END)
+
+            time.sleep(0.016)
+
+    threading.Thread(target=_update_output, daemon=True).start()
 
     # run the ui
     root.mainloop()

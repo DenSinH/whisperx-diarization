@@ -97,6 +97,15 @@ def get_args():
         help="if you have a GPU use 'cuda', otherwise 'cpu'",
     )
 
+    parser.add_argument(
+        "--no-diarize",
+        action="store_false",
+        dest="diarize",
+        default=True,
+        help="Disables speaker recognition. "
+             "This significantly speeds up the transcription process.",
+    )
+
     return parser.parse_args()
 
 
@@ -146,12 +155,12 @@ def _transcription_context():
     print("\n\nEnd of transcription, start post-processing")
 
 
-def _print_segment(segment):
+def _print_segment(segment, **kwargs):
     """ Print a single segment, to be followed up by more """
     text = segment["text"]
     if isinstance(text, list):
         text = text[0]
-    print(text.strip(), end=" ", flush=True)
+    print(text.strip(), end=" ", flush=True, **kwargs)
 
 
 def _print_transcription_onload(result):
@@ -251,6 +260,11 @@ def diarize(audio, aligned, min_speakers=None, max_speakers=None):
     return result
 
 
+def write_transcript(fp, transcript):
+    for segment in transcript["segments"]:
+        _print_segment(segment, file=fp)
+
+
 def write_diarized_transcript(fp, diarized):
     if not diarized["segments"]:
         return
@@ -295,12 +309,16 @@ if __name__ == '__main__':
     # delete model if low on GPU resources
     # import gc; gc.collect(); torch.cuda.empty_cache(); del model
 
-    aligned = align(audio, transcript)
+    if args.diarize:
+        aligned = align(audio, transcript)
 
-    # delete model if low on GPU resources
-    # gc.collect(); torch.cuda.empty_cache(); del model_a
+        # delete model if low on GPU resources
+        # gc.collect(); torch.cuda.empty_cache(); del model_a
 
-    diarized = diarize(audio, aligned)
+        diarized = diarize(audio, aligned)
 
-    with open(Path(args.audio).with_suffix(".txt"), "w+") as f:
-        write_diarized_transcript(f, diarized)
+        with open(Path(args.audio).with_suffix(".txt"), "w+") as f:
+            write_diarized_transcript(f, diarized)
+    else:
+        with open(Path(args.audio).with_suffix(".txt"), "w+") as f:
+            write_transcript(f, transcript)
