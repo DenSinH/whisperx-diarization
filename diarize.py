@@ -20,7 +20,7 @@ from contextlib import contextmanager
 # to access the diarization model
 HF_TOKEN = os.environ["HF_TOKEN"]
 MTYPES = {"cpu": "int8", "cuda": "float16"}
-MODEL_DIR = "./.models/"
+MODEL_DIR = Path("./.models/")
 CACHE_DIR = Path("./.cache/")
 AUDIO_HASH = None
 
@@ -180,7 +180,8 @@ def transcribe(audio: np.array):
         compute_type=MTYPES[args.device],
         language=args.language,
         download_root=MODEL_DIR,
-        threads=0  # max threads
+        threads=0,  # max threads
+        vad_model_fp=MODEL_DIR / "vad.bin"
     )
 
     """ monkey patch the whisper model call to print intermediate output """

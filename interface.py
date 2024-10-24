@@ -40,7 +40,7 @@ def stream_transcription(filepath: Path, diarize):
         "-a", os.path.abspath(filepath),
         "--whisper-model", "large-v3",
         # "--device", "cpu",  # commented out for auto-selection based on cuda availability
-        "--batch-size", "4",  # 16 is too large, run out of GPU memory
+        "--batch-size", "2",  # 16 is too large, run out of GPU memory
         "--language", "nl",
     ]
 
