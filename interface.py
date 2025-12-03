@@ -24,7 +24,7 @@ def output_string(log, string: str):
         OUTPUT_BUFFER += string
 
 
-def stream_transcription(filepath: Path, diarize):
+def stream_transcription(filepath: Path, diarize: bool, batch_size: int = 2):
     """ Main function, calls the diarize script with the appropriate parameters """
     global PROC, OUTPUT_BUFFER
     if PROC is not None:
@@ -40,13 +40,14 @@ def stream_transcription(filepath: Path, diarize):
         "-a", os.path.abspath(filepath),
         "--whisper-model", "large-v3",
         # "--device", "cpu",  # commented out for auto-selection based on cuda availability
-        "--batch-size", "2",  # 16 is too large, run out of GPU memory
+        "--batch-size", str(batch_size),  # 16 is too large, run out of GPU memory
         "--language", "nl",
     ]
 
     if not diarize:
         cmd.append("--no-diarize")
 
+    print("Starting diarization with command", cmd)
     PROC = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
@@ -74,16 +75,21 @@ def stream_transcription(filepath: Path, diarize):
     yield "Cleanup complete\n"
 
 
-def start_process():
+def start_process(**kwargs):
     """ Start the transcription if a file is selected """
     filepath = filedialog.askopenfilename()
     if filepath:
         # clear the text box
         output_text.delete("1.0", tk.END)
-        threading.Thread(target=poll_subprocess, args=(Path(filepath), diarize_var.get()), daemon=True).start()
+        threading.Thread(
+            target=poll_subprocess,
+            args=(Path(filepath), diarize_var.get()),
+            kwargs=kwargs,
+            daemon=True,
+        ).start()
 
 
-def poll_subprocess(filepath: Path, diarize: bool):
+def poll_subprocess(filepath: Path, diarize: bool, **kwargs):
     """ Poll the transcription process to stream output to the window """
     try:
         with open(filepath.with_suffix(".log"), "w+", errors="ignore") as log:
@@ -129,16 +135,33 @@ if __name__ == '__main__':
     top_frame.pack(side=tk.TOP, fill=tk.X, pady=10)
 
     # widgets
+    def validate_int(new_value):
+        # Allow empty string (so user can delete)
+        if new_value == "":
+            return True
+        return new_value.isdigit()
+
+
+    vcmd = (top_frame.register(validate_int), "%P")
+
+    batch_size_entry = tk.Entry(
+        top_frame,
+        validate="key",
+        validatecommand=vcmd
+    )
+    batch_size_entry.insert(0, "8")
+
     select_file_btn = tk.Button(
         top_frame,
         text="Kies Bestand",
-        command=start_process,
+        command=lambda: start_process(batch_size=batch_size_entry.get()),
         bg="#2b2b2b",
         fg="#FFFFFF",
         padx=10,
         pady=5
     )
     select_file_btn.pack(side=tk.LEFT, padx=(0, 10))
+    batch_size_entry.pack(side=tk.LEFT, padx=(0, 10))
 
     # Add a checkbox for 'Sprekerherkenning'
     diarize_var = tk.BooleanVar()
