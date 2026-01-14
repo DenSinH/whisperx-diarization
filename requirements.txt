@@ -1,5 +1,4 @@
-# f2da2f858e99e4211fe4f64b5f2938b007827e17 works with the current
+# 3.7.4 is recent AND works with the current
 # 'monkey patches' for progress printing
-git+https://github.com/m-bain/whisperX.git@f2da2f858e99e4211fe4f64b5f2938b007827e17
-numpy<2
-python-dotenv==1.0.1
+whisperx==3.7.4
+python-dotenv==1.2.1

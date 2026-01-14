@@ -24,7 +24,12 @@ def output_string(log, string: str):
         OUTPUT_BUFFER += string
 
 
-def stream_transcription(filepath: Path, diarize: bool, batch_size: int = 2):
+def stream_transcription(
+        filepath: Path,
+        diarize: bool,
+        batch_size: int = 2,
+        model_name: str = "turbo",
+):
     """ Main function, calls the diarize script with the appropriate parameters """
     global PROC, OUTPUT_BUFFER
     if PROC is not None:
@@ -38,7 +43,7 @@ def stream_transcription(filepath: Path, diarize: bool, batch_size: int = 2):
         sys.executable,
         "./diarize.py",
         "-a", os.path.abspath(filepath),
-        "--whisper-model", "large-v3",
+        "--whisper-model", model_name,
         # "--device", "cpu",  # commented out for auto-selection based on cuda availability
         "--batch-size", str(batch_size),  # 16 is too large, run out of GPU memory
         "--language", "nl",
@@ -93,7 +98,7 @@ def poll_subprocess(filepath: Path, diarize: bool, **kwargs):
     """ Poll the transcription process to stream output to the window """
     try:
         with open(filepath.with_suffix(".log"), "w+", errors="ignore") as log:
-            for output in stream_transcription(filepath, diarize):
+            for output in stream_transcription(filepath, diarize, **kwargs):
                 output_string(log, output)
     except RuntimeError:
         # it is possible we tried to append to the output text

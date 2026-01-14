@@ -58,19 +58,24 @@ def get_args():
     """ 
     from https://github.com/openai/whisper:
     Size     Parameters  English-only model    Multilingual model    Required VRAM    Relative speed
-    tiny     39 M        tiny.en               tiny                  ~1 GB            ~32x
-    base     74 M        base.en               base                  ~1 GB            ~16x
-    small    244 M      small.en              small                  ~2 GB            ~6x
-    medium   769 M     medium.en             medium                  ~5 GB            ~2x
-    large    1550 M     N/A                   large                  ~10 GB           1x
+    tiny     39 M        tiny.en               tiny                  ~1 GB            ~10x
+    base     74 M        base.en               base                  ~1 GB            ~7x
+    small    244 M       small.en              small                 ~2 GB            ~4x
+    medium   769 M       medium.en             medium                ~5 GB            ~2x
+    large    1550 M	     N/A                   large                 ~10 GB           1x
+    turbo    809 M	     N/A                   turbo                 ~6 GB            ~8x
+    
+    There are also:
     large-v2
     large-v3
+    
+    turbo is an optimized version of large-v3
     """
 
     parser.add_argument(
         "--whisper-model",
         dest="model_name",
-        default="large-v3",
+        default="turbo",
         help="name of the Whisper model to use",
     )
 
@@ -173,7 +178,7 @@ def _print_transcription_onload(result):
 
 @cached("transcription", _print_transcription_onload)
 def transcribe(audio: np.array):
-    logging.info("Loading transcription model")
+    logging.info(f"Loading transcription model '{args.model_name}'")
     model = whisperx.load_model(
         args.model_name,
         args.device,
@@ -181,7 +186,6 @@ def transcribe(audio: np.array):
         language=args.language,
         download_root=MODEL_DIR,
         threads=0,  # max threads
-        vad_model_fp=MODEL_DIR / "vad.bin"
     )
 
     """ monkey patch the whisper model call to print intermediate output """
@@ -297,6 +301,29 @@ if __name__ == '__main__':
     import whisperx
     logging.info("Loading torch")
     import torch
+
+    # this needs to be set, otherwise the "weights_only load" fails when loading
+    # the 'turbo' model"
+    # _pickle.UnpicklingError: Weights only load failed. This file can still be loaded,
+    #       to do so you have two options, do those steps only if you trust the source
+    #       of the checkpoint.
+    # 	(1) In PyTorch 2.6, we changed the default value of the `weights_only` argument
+    #   	in `torch.load` from `False` to `True`. Re-running `torch.load` with
+    #      	`weights_only` set to `False` will likely succeed, but it can result in
+    #      	arbitrary code execution. Do it only if you got the file from a trusted
+    #      	source.
+    # 	(2) Alternatively, to load with `weights_only=True` please check the recommended
+    # 	    steps in the following error message.
+    # 	WeightsUnpickler error: Unsupported global: GLOBAL omegaconf.listconfig.ListConfig
+    # 	was not an allowed global by default. Please use
+    #  	    `torch.serialization.add_safe_globals([omegaconf.listconfig.ListConfig])`
+    #  	or the
+    #  	    `torch.serialization.safe_globals([omegaconf.listconfig.ListConfig])`
+    #  	context manager to allowlist this global if you trust this class/function.
+    #
+    # Setting this environment variable seems to fix the issue:
+    # https://github.com/m-bain/whisperX/issues/1304
+    os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
 
     args = get_args()
 
