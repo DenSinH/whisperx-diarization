@@ -154,7 +154,7 @@ if __name__ == '__main__':
         validate="key",
         validatecommand=vcmd
     )
-    batch_size_entry.insert(0, "8")
+    batch_size_entry.insert(0, "2")
 
     select_file_btn = tk.Button(
         top_frame,

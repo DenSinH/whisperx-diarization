@@ -232,7 +232,9 @@ def align(audio, transcript):
 @cached("diarization")
 def diarize(audio, aligned, min_speakers=None, max_speakers=None):
     logging.info("Loading diarization model")
-    diarize_model = whisperx.DiarizationPipeline(
+    from whisperx.diarize import DiarizationPipeline
+
+    diarize_model = DiarizationPipeline(
         use_auth_token=HF_TOKEN,
         device=args.device
     )
